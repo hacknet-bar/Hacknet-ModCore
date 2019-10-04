@@ -20,7 +20,6 @@ using Newtonsoft.Json;
 
 namespace ModCore
 {
-
     public class Settings : ModManager.ModSettings
     {
         public int CurFont = -1;
@@ -33,7 +32,7 @@ namespace ModCore
     {
         //public static float MachineEpsilonFloat = GetMachineEpsilonFloat();
         public static Settings settings;
-
+        public static List<string> FontName = new List<string>();
         public static HarmonyInstance Harmony = null;
         public static ModManager.ModEntry.ModLogger Logger;
         public static Assembly GameAssembly;
@@ -77,7 +76,7 @@ namespace ModCore
                 return;
 
             TextItem.doMeasuredSmallLabel(new Vector2(ranged.X + 25, ranged.Y + 25), "ModsCore.Settings.FontName".Translate(), Color.White);
-            settings.CurFont = SelectableTextList.doFancyList((modEntry.Info.Id + "FontName").GetHashCode(), (int)ranged.X, (int)ranged.Y + 50, (int)ranged.Z - 50, (int)ranged.W - 50, settings.FontList.ToArray(), settings.CurFont, Color.White);
+            settings.CurFont = SelectableTextList.doFancyList((modEntry.Info.Id + "FontName").GetHashCode(), (int)ranged.X, (int)ranged.Y + 50, (int)ranged.Z - 50, (int)ranged.W - 50, Main.FontName.ToArray(), settings.CurFont, Color.White);
         }
 
         private static void SaveMethod(ModManager.ModEntry modEntry,object[] param) => settings.Save(modEntry);
@@ -94,14 +93,14 @@ namespace ModCore
             }
             if(settings.FontList.Count == 0)
             {
-                settings.FontList.Add("微软雅黑");
-                settings.FontList.Add("宋体");
-                settings.FontList.Add("幼圆");
+                settings.FontList.Add("Font_MSYH");
+                settings.FontList.Add("Font_Song");
                 settings.FontList.Sort();
-                settings.CurFont = settings.FontList.IndexOf("微软雅黑");
+                settings.CurFont = settings.FontList.IndexOf("Font_MSYH");
             }
             if(settings.CurFont < 0 || settings.CurFont > settings.FontList.Count - 1)
-                settings.CurFont = settings.FontList.IndexOf("微软雅黑");
+                settings.CurFont = settings.FontList.IndexOf("Font_MSYH");
+            
 
             modEntry.SaveMethod = SaveMethod;
             modEntry.DrawSettingUIMethod = DrawMenu;
@@ -114,6 +113,18 @@ namespace ModCore
             {
                 var original = GameAssembly.GetType("Hacknet.MainMenu").GetMethod("drawMainMenuButtons", BindingFlags.NonPublic | BindingFlags.Instance);
                 var postfix = typeof(Main).GetMethod("drawMainMenuButtonsPostfix");
+                Harmony.Patch(original, null, new HarmonyMethod(postfix));
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex.ToString());
+            }
+
+            //Patch MainMenu..ctor
+            try
+            {
+                var original = GameAssembly.GetType("Hacknet.MainMenu").GetConstructor(new Type[] { });
+                var postfix = typeof(Main).GetMethod("OptionsMenuDrawPostfix");
                 Harmony.Patch(original, null, new HarmonyMethod(postfix));
             }
             catch (Exception ex)
@@ -143,11 +154,23 @@ namespace ModCore
                 Logger.Error(ex.ToString());
             }
 
-            //Patch Game..ctor
+            //Patch Game.Game1LoadContentPostfix
             try
             {
-                var original = typeof(Game1).GetConstructor(new Type[] { });
-                var postfix = typeof(Main).GetMethod("Game1InstantiatePostfix");
+                var original = typeof(Game1).GetMethod("LoadContent", BindingFlags.NonPublic | BindingFlags.Instance);
+                var postfix = typeof(Main).GetMethod("Game1LoadContentPostfix");
+                Harmony.Patch(original, null, new HarmonyMethod(postfix));
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex.ToString());
+            }
+
+            //Patch OptionsMenu.Draw
+            try
+            {
+                var original = GameAssembly.GetType("Hacknet.OptionsMenu").GetMethod("Draw", BindingFlags.Public | BindingFlags.Instance);
+                var postfix = typeof(Main).GetMethod("OptionsMenuDrawPostfix");
                 Harmony.Patch(original, null, new HarmonyMethod(postfix));
             }
             catch (Exception ex)
@@ -165,29 +188,41 @@ namespace ModCore
             if (Button.doButton(999, 10, 10, 220, 30, "Mods", Color.Gray))
                 __instance.ScreenManager.AddScreen(new ModsMenu(), __instance.ScreenManager.controllingPlayer);
         }
-        public static void Game1InstantiatePostfix(Game __instance)
+        public static void Game1LoadContentPostfix(Game __instance)
         {
+            ModManager.CurLanguage = Hacknet.Settings.ActiveLocale;
+            Main.FontName.Clear();
+            foreach (var i in settings.FontList)
+                Main.FontName.Add(i.Translate());
             Font font;
             if(CurSpriteFont10 == null)
             {
-                font = new Font(settings.FontList[settings.CurFont], 10, FontStyle.Bold);
+                font = new Font(FontName[settings.CurFont], 10, FontStyle.Bold);
                 CurSpriteFont10 = new SpriteFontX(font, (IGraphicsDeviceService)__instance.Content.ServiceProvider.GetService(typeof(IGraphicsDeviceService)), System.Drawing.Text.TextRenderingHint.SystemDefault);
             }
             if (CurSpriteFont12 == null)
             {
-                font = new Font(settings.FontList[settings.CurFont], 12, FontStyle.Bold);
+                font = new Font(FontName[settings.CurFont], 12, FontStyle.Bold);
                 CurSpriteFont12 = new SpriteFontX(font, (IGraphicsDeviceService)__instance.Content.ServiceProvider.GetService(typeof(IGraphicsDeviceService)), System.Drawing.Text.TextRenderingHint.SystemDefault);
             }
             if (CurSpriteFont23 == null)
             {
-                font = new Font(settings.FontList[settings.CurFont], 23, FontStyle.Bold);
+                font = new Font(FontName[settings.CurFont], 23, FontStyle.Bold);
                 CurSpriteFont23 = new SpriteFontX(font, (IGraphicsDeviceService)__instance.Content.ServiceProvider.GetService(typeof(IGraphicsDeviceService)), System.Drawing.Text.TextRenderingHint.SystemDefault);
             }
             if (CurSpriteFont7 == null)
             {
-                font = new Font(settings.FontList[settings.CurFont], 7, FontStyle.Bold);
+                font = new Font(FontName[settings.CurFont], 7, FontStyle.Bold);
                 CurSpriteFont7 = new SpriteFontX(font, (IGraphicsDeviceService)__instance.Content.ServiceProvider.GetService(typeof(IGraphicsDeviceService)), System.Drawing.Text.TextRenderingHint.SystemDefault);
             }
+            
+        }
+        public static void OptionsMenuDrawPostfix()
+        {
+            ModManager.CurLanguage = Hacknet.Settings.ActiveLocale;
+            Main.FontName.Clear();
+            foreach (var i in settings.FontList)
+                Main.FontName.Add(i.Translate());
         }
 
         public static GameScreen ShowMessageBox(string message,
@@ -225,7 +260,7 @@ namespace ModCore
 
         public static bool DrawStringPrefixCover( SpriteFont spriteFont, string text, Vector2 position, Microsoft.Xna.Framework.Color color, float rotation, Vector2 origin, Vector2 scale, SpriteEffects effects, float layerDepth)
         {
-            if (text == null && text.Length == 0)
+            if ((text == null && text.Length == 0))
                 return true;
 
             bool hasChineseWord = false;
@@ -249,86 +284,7 @@ namespace ModCore
             else
                 return true;
             return false;
-            //    //effects &= (SpriteEffects.FlipHorizontally | SpriteEffects.FlipVertically);
-            //    //Vector2 VecOfText = Vector2.Zero;
-            //    //bool newLines = true;
 
-            //    //List<char> characterMap = (List<char>)typeof(SpriteFont).GetField("characterMap", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(spriteFont);
-            //    //List<Vector3> kerning = (List<Vector3>)typeof(SpriteFont).GetField("kerning", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(spriteFont);
-            //    //List<Rectangle> croppingData = (List<Rectangle>)typeof(SpriteFont).GetField("croppingData", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(spriteFont);
-            //    //List<Rectangle> glyphData = (List<Rectangle>)typeof(SpriteFont).GetField("glyphData", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(spriteFont);
-            //    //Texture2D textureValue = (Texture2D)typeof(SpriteFont).GetField("textureValue", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(spriteFont);
-
-            //    //if (effects != 0)
-            //    //{
-            //    //    Vector2 measureString = spriteFont.MeasureString(text);
-            //    //    origin.X -= measureString.X * axisIsMirroredX[(int)effects];
-            //    //    origin.Y -= measureString.Y * axisIsMirroredY[(int)effects];
-            //    //}
-
-            //    //int IndexOfChar;
-            //    //foreach (char c in text)
-            //    //{
-            //    //    switch (c)
-            //    //    {
-            //    //        case '\n':
-            //    //            VecOfText.X = 0f;
-            //    //            VecOfText.Y += spriteFont.LineSpacing;
-            //    //            newLines = true;
-            //    //            continue;
-            //    //        case '\r':
-            //    //            continue;
-            //    //    }
-
-            //    //    IndexOfChar = characterMap.IndexOf(c);
-            //    //    if (IndexOfChar == -1)
-            //    //    {
-            //    //        if (!spriteFont.DefaultCharacter.HasValue)
-            //    //            throw new ArgumentException("Text contains characters that cannot be resolved by this SpriteFont.", "text");
-            //    //        IndexOfChar = characterMap.IndexOf(spriteFont.DefaultCharacter.Value);
-            //    //    }
-            //    //    if (newLines)
-            //    //    {
-            //    //        VecOfText.X += Math.Abs(kerning[IndexOfChar].X);
-            //    //        newLines = false;
-            //    //    }
-            //    //    else
-            //    //        VecOfText.X += spriteFont.Spacing + kerning[IndexOfChar].X;
-
-            //    //    float num2 = origin.X + (VecOfText.X + (float)croppingData[IndexOfChar].X) * axisDirectionX[(int)effects];
-            //    //    float num3 = origin.Y + (VecOfText.Y + (float)croppingData[IndexOfChar].Y) * axisDirectionY[(int)effects];
-            //    //    if (effects != 0)
-            //    //    {
-            //    //        num2 += (float)glyphData[IndexOfChar].Width * axisIsMirroredX[(int)effects];
-            //    //        num3 += (float)glyphData[IndexOfChar].Height * axisIsMirroredY[(int)effects];
-            //    //    }
-            //    //    float sourceW = Math.Max(glyphData[IndexOfChar].Width, MachineEpsilonFloat) / (float)textureValue.Width;
-            //    //    float sourceH = Math.Max(glyphData[IndexOfChar].Height, MachineEpsilonFloat) / (float)textureValue.Height;
-
-
-            //    //    //PushSprite.Invoke(GuiData.spriteBatch, new object[] {
-            //    //    //    textureValue,                                           //texture
-            //    //    //    (float)glyphData[IndexOfChar].X / textureValue.Width,   //sourceX
-            //    //    //    (float)glyphData[IndexOfChar].Y / textureValue.Height,  //sourceY
-            //    //    //    sourceW,                                                //sourceW
-            //    //    //    sourceH,                                                //sourceH
-            //    //    //    position.X,                                             //destinationX
-            //    //    //    position.Y,                                             //destinationY
-            //    //    //    (float)glyphData[IndexOfChar].Width * scale.X,          //destinationW
-            //    //    //    (float)glyphData[IndexOfChar].Height * scale.Y,         //destinationH
-            //    //    //    color,
-            //    //    //    num2 / sourceW / textureValue.Width,                    //originX
-            //    //    //    num3 / sourceH / textureValue.Height,                   //originY
-            //    //    //    (float)Math.Sin(rotation),                              //rotationSin
-            //    //    //    (float)Math.Cos(rotation),                              //rotationCos
-            //    //    //    layerDepth,                                             //depth
-            //    //    //    (byte)effects                                           //effects
-            //    //    //});
-
-
-
-            //    //    VecOfText.X += kerning[IndexOfChar].Y + kerning[IndexOfChar].Z;
-            //    //}
         }
 }
 
@@ -337,8 +293,8 @@ namespace ModCore
         private static Dictionary<int, ModManager.ModEntry> m_ActDicModEntries = null;
         private static Dictionary<int, ModManager.ModEntry> m_DeactDicModModEntries = null;
         private static FieldInfo ModsConfig_FieldInfo = null;
-        private static GameScreen MessageBox_NeedSave = null;
-        private static GameScreen MessageBox_NeedClosedGame = null;
+        private GameScreen MessageBox_NeedSave = null;
+        private GameScreen MessageBox_NeedClosedGame = null;
         private static bool IsChange = false;
         private static bool Saved = true;
         private static List<string> m_ActivatedMods = null;
@@ -500,24 +456,24 @@ namespace ModCore
             else
                 currentActMods = SelectableTextList.doFancyList(25, 50, 140, 300, ScreenManager.GraphicsDevice.Viewport.Height - 50, m_ActivatedMods.ToArray(), currentActMods, Color.White);
 
-            if (OpenSettingUI && Button.doButton("CloseSettingUI".GetHashCode(), 400, 210, 100, 30, "ModsCore.Mods.CloseSettingUI".Translate(), Color.BlueViolet))
+            if (OpenSettingUI && Button.doButton("CloseSettingUI".GetHashCode(), 400, 210, 150, 30, "ModsCore.Mods.CloseSettingUI".Translate(), Color.BlueViolet))
                 OpenSettingUI = false;
-            if (currentActMods > 0 && Button.doButton("Up".GetHashCode(), 400, 250, 100, 30, "ModsCore.Mods.Up".Translate(), Color.BlueViolet))
+            if (currentActMods > 0 && Button.doButton("Up".GetHashCode(), 400, 250, 150, 30, "ModsCore.Mods.Up".Translate(), Color.BlueViolet))
             {
                 MoveUp();
                 IsChange = true;
                 Saved = false;
             }
-            if (currentActMods >= 0 && currentActMods != m_ActivatedMods.Count - 1 && Button.doButton("Down".GetHashCode(), 400, 290, 100, 30, "ModsCore.Mods.Down".Translate(), Color.BlueViolet))
+            if (currentActMods >= 0 && currentActMods != m_ActivatedMods.Count - 1 && Button.doButton("Down".GetHashCode(), 400, 290, 150, 30, "ModsCore.Mods.Down".Translate(), Color.BlueViolet))
             {
                 MoveDown();
                 IsChange = true;
                 Saved = false;
             }
-            if (!OpenSettingUI && currentActMods != -1 && Button.doButton("OpenSettingUI".GetHashCode(), 400, 210, 100, 30, "ModsCore.Mods.OpenSettingUI".Translate(), Color.BlueViolet))
+            if (!OpenSettingUI && currentActMods != -1 && Button.doButton("OpenSettingUI".GetHashCode(), 400, 210, 150, 30, "ModsCore.Mods.OpenSettingUI".Translate(), Color.BlueViolet))
                 OpenSettingUI = true;
 
-            if (currentActMods >= 0 && Button.doButton("DeactivateMod".GetHashCode(), 400, 330, 100, 30, "ModsCore.Mods.DeactivateMod".Translate(), Color.BlueViolet))
+            if (currentActMods >= 0 && Button.doButton("DeactivateMod".GetHashCode(), 400, 330, 150, 30, "ModsCore.Mods.DeactivateMod".Translate(), Color.BlueViolet))
             {
                 IsChange = true;
                 Saved = false;
@@ -533,7 +489,7 @@ namespace ModCore
                 currentActMods = -1;
             }
 
-            if (!OpenSettingUI && currentDeactMods >= 0 && Button.doButton("ActivateMod".GetHashCode(), 400, 370, 100, 30, "ModsCore.Mods.ActivateMod".Translate(), Color.BlueViolet))
+            if (!OpenSettingUI && currentDeactMods >= 0 && Button.doButton("ActivateMod".GetHashCode(), 400, 370, 150, 30, "ModsCore.Mods.ActivateMod".Translate(), Color.BlueViolet))
             {
                 IsChange = true;
                 Saved = false;
